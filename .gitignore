@@ -1,0 +1,4 @@
+secret.key
+passwords.json
+__pycache__/
+.streamlit/
