@@ -44,6 +44,7 @@ streamlit run password_manager.py
 
 
 password-manager/
+
 │-- password_manager.py   # Main Streamlit app
 
 │-- .gitignore            # Keeps sensitive files out of GitHub
