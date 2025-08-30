@@ -15,7 +15,7 @@ This app allows you to **store, view, and delete passwords** safely using encryp
 
 ---
 
-## 🛠️ Installation & Setup
+# 🛠️ Installation & Setup
 
 1. Clone this repository:
    ```bash
