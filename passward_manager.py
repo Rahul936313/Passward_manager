@@ -6,19 +6,18 @@ import os
 import json
 from cryptography.fernet import Fernet
 
-# ========== Password Generator ==========
+# ================= Password Generator =================
 def generate_password(length=12):
     chars = string.ascii_letters + string.digits + string.punctuation
-    password = ''.join(secrets.choice(chars) for _ in range(length))
-    return password
+    return ''.join(secrets.choice(chars) for _ in range(length))
 
-# ========== Password Strength Checker ==========
+# ================= Password Strength Checker =================
 def check_strength(password):
     length_error = len(password) < 8
     digit_error = re.search(r"\d", password) is None
     uppercase_error = re.search(r"[A-Z]", password) is None
     lowercase_error = re.search(r"[a-z]", password) is None
-    symbol_error = re.search(r"[^\w]", password) is None  # Any non-word char
+    symbol_error = re.search(r"[^\w]", password) is None
 
     errors = [length_error, digit_error, uppercase_error, lowercase_error, symbol_error]
 
@@ -29,7 +28,7 @@ def check_strength(password):
     else:
         return "⚡ Moderate"
 
-# ========== Encryption Setup ==========
+# ================= Encryption Setup =================
 KEY_FILE = "secret.key"
 DATA_FILE = "passwords.json"
 
@@ -45,13 +44,9 @@ def load_key():
 
 fernet = load_key()
 
-# ========== Save / Load / Delete Passwords ==========
+# ================= Save / Load / Delete Passwords =================
 def save_password(site, username, password):
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            data = json.load(f)
-    else:
-        data = {}
+    data = load_passwords()
     encrypted_pwd = fernet.encrypt(password.encode()).decode()
     if site not in data:
         data[site] = []
@@ -69,10 +64,7 @@ def decrypt_password(enc_pwd):
     return fernet.decrypt(enc_pwd.encode()).decode()
 
 def delete_password(site, username):
-    if not os.path.exists(DATA_FILE):
-        return
-    with open(DATA_FILE, "r") as f:
-        data = json.load(f)
+    data = load_passwords()
     if site in data:
         data[site] = [entry for entry in data[site] if entry["username"] != username]
         if not data[site]:
@@ -80,14 +72,13 @@ def delete_password(site, username):
         with open(DATA_FILE, "w") as f:
             json.dump(data, f, indent=4)
 
-# ========== Streamlit UI ==========
+# ================= Streamlit UI =================
 st.title("🔐 Password Generator + Strength Checker + Manager")
 
-st.warning(
-    "⚠️ Passwords are securely encrypted and stored locally using Fernet, but anyone with access to both the `secret.key` and `passwords.json` files can decrypt them."
-)
+st.warning("⚠️ Passwords are encrypted with a local `secret.key`. "
+           "Keep both `secret.key` and `passwords.json` safe!")
 
-# Sidebar Options
+# Sidebar options
 st.sidebar.header("Options")
 length = st.sidebar.slider("Password Length", 6, 32, 12)
 
@@ -106,8 +97,12 @@ if user_pwd:
 st.write("---")
 
 # Password Manager
-st.subheader("📂 Password Manager")
+st.subheader("📂 Saved Passwords")
 
+# ✅ Always load data when app starts
+data = load_passwords()
+
+# Save new password
 with st.form("save_form"):
     site = st.text_input("Website / App")
     username = st.text_input("Username / Email")
@@ -117,17 +112,18 @@ with st.form("save_form"):
     if save_btn and site and username and pwd_to_save:
         save_password(site, username, pwd_to_save)
         st.success("Password saved securely ✅")
-        st.rerun()
+        st.rerun()  # Refresh so new password appears immediately
 
-st.write("### 🔍 Stored Passwords")
-data = load_passwords()
+# Show stored data
 if data:
     for site, entries in data.items():
         st.write(f"**{site}**")
         for idx, entry in enumerate(entries):
             decrypted_pwd = decrypt_password(entry['password'])
             with st.expander(f"👤 {entry['username']}"):
-                st.code(decrypted_pwd, language="text")
+                # Show in copyable text field
+                st.text_input("🔑 Password", decrypted_pwd, key=f"pwd-{site}-{entry['username']}-{idx}")
+
                 if st.button(f"🗑 Delete", key=f"del-{site}-{entry['username']}-{idx}"):
                     delete_password(site, entry['username'])
                     st.warning(f"Deleted entry for {site} ({entry['username']})")
