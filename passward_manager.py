@@ -9,15 +9,6 @@ from cryptography.fernet import Fernet
 if "session_passwords" not in st.session_state:
     st.session_state.session_passwords = {}  # key = site, value = list of {username, password}
 
-# Rerun flag to safely refresh after form submission or delete
-if "refresh" not in st.session_state:
-    st.session_state.refresh = False
-
-# ✅ Only rerun if the flag is True
-if st.session_state.refresh:
-    st.session_state.refresh = False
-    st.experimental_rerun()  # safe rerun
-
 # ================= Password Generator =================
 def generate_password(length=12):
     chars = string.ascii_letters + string.digits + string.punctuation
@@ -64,7 +55,6 @@ def decrypt_password(enc_pwd):
 
 # ================= Streamlit UI =================
 st.title("🔐 Password Generator + Strength Checker + Manager")
-
 st.warning(
     "⚠️ Passwords are encrypted locally in your session. "
     "They are not stored on the server and disappear when the session ends."
@@ -92,7 +82,7 @@ st.write("---")
 st.subheader("📂 Saved Passwords")
 
 # Save new password form
-with st.form("save_form"):
+with st.form("save_form", clear_on_submit=True):
     site = st.text_input("Website / App")
     username = st.text_input("Username / Email")
     pwd_to_save = st.text_input("Password", type="password")
@@ -101,7 +91,6 @@ with st.form("save_form"):
     if save_btn and site and username and pwd_to_save:
         save_password(site, username, pwd_to_save)
         st.success("Password saved securely in your session ✅")
-        st.session_state.refresh = True  # safely refresh after form
 
 # Show stored passwords
 if st.session_state.session_passwords:
@@ -111,12 +100,13 @@ if st.session_state.session_passwords:
             decrypted_pwd = decrypt_password(entry['password'])
             with st.expander(f"👤 {entry['username']}"):
                 st.text_input("🔑 Password", decrypted_pwd, key=f"pwd-{site}-{entry['username']}-{idx}")
-                if st.button(f"🗑 Delete", key=f"del-{site}-{entry['username']}-{idx}"):
+                delete_key = f"del-{site}-{entry['username']}-{idx}"
+                if st.button(f"🗑 Delete", key=delete_key):
                     delete_password(site, entry['username'])
                     st.warning(f"Deleted entry for {site} ({entry['username']})")
-                    st.session_state.refresh = True  # safely refresh after delete
+                    st.experimental_rerun = False  # remove any rerun
 
-    # Download button for encrypted passwords
+    # Download encrypted passwords
     st.download_button(
         label="💾 Download My Passwords (Encrypted)",
         data=json.dumps(st.session_state.session_passwords, indent=4),
