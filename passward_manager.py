@@ -9,6 +9,14 @@ from cryptography.fernet import Fernet
 if "session_passwords" not in st.session_state:
     st.session_state.session_passwords = {}  # key = site, value = list of {username, password}
 
+# Rerun flag to safely refresh after form submission
+if "refresh" not in st.session_state:
+    st.session_state.refresh = False
+
+if st.session_state.refresh:
+    st.session_state.refresh = False
+    st.experimental_rerun()
+
 # ================= Password Generator =================
 def generate_password(length=12):
     chars = string.ascii_letters + string.digits + string.punctuation
@@ -92,7 +100,7 @@ with st.form("save_form"):
     if save_btn and site and username and pwd_to_save:
         save_password(site, username, pwd_to_save)
         st.success("Password saved securely in your session ✅")
-        st.experimental_rerun()  # refresh UI
+        st.session_state.refresh = True  # safely refresh after form
 
 # Show stored passwords
 if st.session_state.session_passwords:
@@ -105,7 +113,7 @@ if st.session_state.session_passwords:
                 if st.button(f"🗑 Delete", key=f"del-{site}-{entry['username']}-{idx}"):
                     delete_password(site, entry['username'])
                     st.warning(f"Deleted entry for {site} ({entry['username']})")
-                    st.experimental_rerun()
+                    st.session_state.refresh = True  # safely refresh after delete
 
     # Download button for user passwords
     st.download_button(
