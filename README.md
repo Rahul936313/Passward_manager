@@ -1,3 +1,6 @@
+## 🔗 Live Demo
+Check out the app live: [Password Manager](https://passward-manager936313.streamlit.app/)
+
 # 🔐 Password Manager with Streamlit
 
 A simple and secure **Password Manager** built with **Python** and **Streamlit**.  
