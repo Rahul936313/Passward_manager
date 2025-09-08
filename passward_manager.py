@@ -2,9 +2,12 @@ import streamlit as st
 import secrets
 import re
 import string
-import os
 import json
 from cryptography.fernet import Fernet
+
+# ================= Session Password Storage =================
+if "session_passwords" not in st.session_state:
+    st.session_state.session_passwords = {}  # key = site, value = list of {username, password}
 
 # ================= Password Generator =================
 def generate_password(length=12):
@@ -28,57 +31,37 @@ def check_strength(password):
     else:
         return "⚡ Moderate"
 
-# ================= Encryption Setup =================
-KEY_FILE = "secret.key"
-DATA_FILE = "passwords.json"
+# ================= Encryption (Session-Only) =================
+session_key = Fernet.generate_key()
+fernet = Fernet(session_key)
 
-def load_key():
-    if not os.path.exists(KEY_FILE):
-        key = Fernet.generate_key()
-        with open(KEY_FILE, "wb") as f:
-            f.write(key)
-    else:
-        with open(KEY_FILE, "rb") as f:
-            key = f.read()
-    return Fernet(key)
-
-fernet = load_key()
-
-# ================= Save / Load / Delete Passwords =================
+# ================= Save / Delete Passwords =================
 def save_password(site, username, password):
-    data = load_passwords()
     encrypted_pwd = fernet.encrypt(password.encode()).decode()
-    if site not in data:
-        data[site] = []
-    data[site].append({"username": username, "password": encrypted_pwd})
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    if site not in st.session_state.session_passwords:
+        st.session_state.session_passwords[site] = []
+    st.session_state.session_passwords[site].append({"username": username, "password": encrypted_pwd})
 
-def load_passwords():
-    if not os.path.exists(DATA_FILE):
-        return {}
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+def delete_password(site, username):
+    if site in st.session_state.session_passwords:
+        st.session_state.session_passwords[site] = [
+            entry for entry in st.session_state.session_passwords[site] if entry["username"] != username
+        ]
+        if not st.session_state.session_passwords[site]:
+            del st.session_state.session_passwords[site]
 
 def decrypt_password(enc_pwd):
     return fernet.decrypt(enc_pwd.encode()).decode()
 
-def delete_password(site, username):
-    data = load_passwords()
-    if site in data:
-        data[site] = [entry for entry in data[site] if entry["username"] != username]
-        if not data[site]:
-            del data[site]
-        with open(DATA_FILE, "w") as f:
-            json.dump(data, f, indent=4)
-
 # ================= Streamlit UI =================
 st.title("🔐 Password Generator + Strength Checker + Manager")
 
-st.warning("⚠️ Passwords are encrypted with a local `secret.key`. "
-           "Keep both `secret.key` and `passwords.json` safe!")
+st.warning(
+    "⚠️ Passwords are encrypted locally in your session. "
+    "They are not stored on the server and disappear when the session ends."
+)
 
-# Sidebar options
+# Sidebar: Password length
 st.sidebar.header("Options")
 length = st.sidebar.slider("Password Length", 6, 32, 12)
 
@@ -88,7 +71,7 @@ if st.button("Generate Password"):
     st.success(f"Generated Password: `{pwd}`")
     st.write("Strength:", check_strength(pwd))
 
-# Strength Checker
+# Password Strength Checker
 st.subheader("🔎 Check Your Own Password")
 user_pwd = st.text_input("Enter a password:", type="password")
 if user_pwd:
@@ -99,10 +82,7 @@ st.write("---")
 # Password Manager
 st.subheader("📂 Saved Passwords")
 
-# ✅ Always load data when app starts
-data = load_passwords()
-
-# Save new password
+# Save new password form
 with st.form("save_form"):
     site = st.text_input("Website / App")
     username = st.text_input("Username / Email")
@@ -111,22 +91,28 @@ with st.form("save_form"):
 
     if save_btn and site and username and pwd_to_save:
         save_password(site, username, pwd_to_save)
-        st.success("Password saved securely ✅")
-        st.rerun()  # Refresh so new password appears immediately
+        st.success("Password saved securely in your session ✅")
+        st.experimental_rerun()  # refresh UI
 
-# Show stored data
-if data:
-    for site, entries in data.items():
+# Show stored passwords
+if st.session_state.session_passwords:
+    for site, entries in st.session_state.session_passwords.items():
         st.write(f"**{site}**")
         for idx, entry in enumerate(entries):
             decrypted_pwd = decrypt_password(entry['password'])
             with st.expander(f"👤 {entry['username']}"):
-                # Show in copyable text field
                 st.text_input("🔑 Password", decrypted_pwd, key=f"pwd-{site}-{entry['username']}-{idx}")
-
                 if st.button(f"🗑 Delete", key=f"del-{site}-{entry['username']}-{idx}"):
                     delete_password(site, entry['username'])
                     st.warning(f"Deleted entry for {site} ({entry['username']})")
-                    st.rerun()
+                    st.experimental_rerun()
+
+    # Download button for user passwords
+    st.download_button(
+        label="💾 Download My Passwords",
+        data=json.dumps(st.session_state.session_passwords, indent=4),
+        file_name="my_passwords.json",
+        mime="application/json"
+    )
 else:
-    st.info("No passwords saved yet.")
+    st.info("No passwords saved in this session yet.")
