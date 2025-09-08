@@ -104,7 +104,6 @@ if st.session_state.session_passwords:
                 if st.button(f"🗑 Delete", key=delete_key):
                     delete_password(site, entry['username'])
                     st.warning(f"Deleted entry for {site} ({entry['username']})")
-                    st.experimental_rerun = False  # remove any rerun
 
     # Download encrypted passwords
     st.download_button(
