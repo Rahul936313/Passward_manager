@@ -9,13 +9,14 @@ from cryptography.fernet import Fernet
 if "session_passwords" not in st.session_state:
     st.session_state.session_passwords = {}  # key = site, value = list of {username, password}
 
-# Rerun flag to safely refresh after form submission
+# Rerun flag to safely refresh after form submission or delete
 if "refresh" not in st.session_state:
     st.session_state.refresh = False
 
+# ✅ Only rerun if the flag is True
 if st.session_state.refresh:
     st.session_state.refresh = False
-    st.experimental_rerun()
+    st.experimental_rerun()  # safe rerun
 
 # ================= Password Generator =================
 def generate_password(length=12):
@@ -115,12 +116,13 @@ if st.session_state.session_passwords:
                     st.warning(f"Deleted entry for {site} ({entry['username']})")
                     st.session_state.refresh = True  # safely refresh after delete
 
-    # Download button for user passwords
+    # Download button for encrypted passwords
     st.download_button(
-        label="💾 Download My Passwords",
+        label="💾 Download My Passwords (Encrypted)",
         data=json.dumps(st.session_state.session_passwords, indent=4),
-        file_name="my_passwords.json",
+        file_name="my_passwords_encrypted.json",
         mime="application/json"
     )
+    st.info("Downloaded passwords are encrypted and cannot be read directly without this session.")
 else:
     st.info("No passwords saved in this session yet.")
